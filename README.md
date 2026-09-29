@@ -1,293 +1,85 @@
-# discv4-dns-lists
+# Ethereum Classic DNS discovery lists
 
-DNS-based node lists for Ethereum Classic, published under three domains and
-consumed by clients through [EIP-1459](https://eips.ethereum.org/EIPS/eip-1459)
-discovery.
+Signed lists of Ethereum Classic and Mordor nodes, published in DNS so that
+clients find their first peers through
+[EIP-1459](https://eips.ethereum.org/EIPS/eip-1459) discovery. The lists are
+rebuilt every night from a crawl of the discv4 network, and every published list
+is committed to this repository, so the record of what clients were given is
+public. They are maintained in the
+[`ethereumclassic`](https://github.com/ethereumclassic) organization by its core
+developers and community contributors.
 
-Each directory is one published tree, named after the DNS domain it serves.
-`all.json` is the working node set the trees are filtered from.
+> [!IMPORTANT]
+> **Move to the community-maintained trees.** Core-geth `v1.12.x` finds its first
+> peers through endpoints the ETC Cooperative maintained: DNS trees published from
+> [`etclabscore/discv4-dns-lists`](https://github.com/etclabscore/discv4-dns-lists)
+> and, in its later releases, the Cooperative's bootnodes. The Cooperative entered
+> maintenance mode at the end of 2024, and its board has communicated that it will
+> dissolve by the end of 2026 and that those trees will be archived as it does.
+> The trees published here continue that service. Core-geth
+> [`v1.13.x`](https://github.com/ethereumclassic/core-geth/releases/latest), from
+> [`ethereumclassic/core-geth`](https://github.com/ethereumclassic/core-geth),
+> reads them by default, and a `v1.12.x` node can switch with
+> [one flag](#quick-start).
+> [The ETC Cooperative transition](https://docs.coregeth.com/etc-cooperative-transition/)
+> lists where the Cooperative's other services continue.
 
-| Domain | DNS provider | Trees |
-|---|---|---|
-| `ethereumclassic.net` | Cloudflare | `all.classic.` · `all.mordor.` |
-| `ethclassic.net` | Cloudflare | `all.classic.` · `all.mordor.` |
-| `ethereumclassic.network` | Cloudflare | `all.classic.` · `all.mordor.` |
-
-**Three domains on one provider is not provider diversity.** A single Cloudflare
-account problem removes every path at once. `devp2p` automates only Cloudflare
-and Route53.
-
-Adding a provider needs no client release and no change to `devp2p`: the
-publisher is chosen per domain in `DOMAINS`, and the `txt` publisher renders a
-tree to JSON for any external tool to push. Such a publisher must be
-**incremental** — EIP-1459 records are content-addressed, so an unchanged node
-keeps its record name and value and only genuine churn has to be written. A
-delete-and-recreate rewrite of a ~180-record tree is ~360 operations and will
-exceed a typical free-tier daily change budget on the first night.
-
-## Why this repository exists
-
-A client with no peers cannot sync, and the lists it starts from decide what its
-first view of the chain is built on. Those lists should come from somewhere the
-project controls and anyone can audit.
-
-**This repository is the audit trail.** The signed DNS records are opaque to
-whoever reads them; the node sets here are not. Anyone can diff what is committed
-against what actually resolves in DNS, and every commit message carries the
-published node count per tree, so a degraded publish is visible in `git log`
-without diffing anything.
-
-**It does not replace the other discovery paths, and must not.** Clients also
-ship hardcoded bootnodes and other operators' DNS trees. More than one
-independent publisher is the point: a client whose every discovery path traces to
-one operator has the same exposure whoever that operator is.
-
-## How the lists are produced
-
-`scripts/update-lists.sh`, run by
-[`update-dns-lists.yml`](.github/workflows/update-dns-lists.yml):
-
-1. **Seed** from the DNS trees other operators already publish.
-2. **Crawl.** `devp2p discv4 crawl` walks the DHT from the bootnodes the client
-   itself ships, and **revalidates the seeded set** — every node is re-pinged; one
-   that stops answering is dropped after a few missed checks, and a seeded node
-   that never answers is dropped once no seed tree carries it.
-3. **Filter.** `devp2p nodeset filter -eth-network classic|mordor` keeps nodes
-   whose fork ID is anywhere on that network's fork schedule. The script then
-   keeps only the nodes on its **current** fork ID — see
-   [below](#only-nodes-on-the-current-fork-id-are-published).
-4. **Cap** to the DNS zone budget, **sign** with the project key, **publish**,
-   **commit** the result here.
-
-**Seeding is not trusting the other publishers.** Step 2 re-pings everything step
-1 brought in, so a stale or hostile entry is not republished while live nodes
-exist, and it is removed from the set as well. What seeding buys is reach;
-verification still happens locally.
-
-**A seeded node that never answers needs its own removal.** `devp2p` drops a node
-whose score falls to zero, but skips rather than drops one that is at zero
-already, which is where every seeded node starts. So a seed record that never
-answers is pruned once no seed tree carries it, and only on a run where every
-seed tree synced: a tree that failed may still carry it, and a run where the
-syncs fail is more likely a resolver or network fault here than a verdict on the
-records.
-
-**It also decides whether this is worth publishing at all.** Measured 2026-08-28:
-
-| | seeded, 60-second crawl | unseeded, 40-minute crawl |
-|---|---|---|
-| classic | 340 | 44 |
-| mordor | 11 | 3 |
-
-An unseeded Mordor tree carries 3 nodes where the existing published tree carries
-11 — a downgrade for anyone who switched to it. Seeded, this tree is a verified
-superset instead.
-
-The yield is low because the discv4 DHT is shared across networks: a crawl seeded
-from ETC bootnodes still walks mostly non-ETC nodes, and `-eth-network` can only
-match a node whose ENR carries an `eth` entry. Many do not.
-
-**`devp2p` must be built from [`ethereumclassic/core-geth`](https://github.com/ethereumclassic/core-geth).**
-Upstream go-ethereum's copy has no `classic` or `mordor` value for
-`-eth-network` and **rejects them** — measured, exit 1 with
-`-eth-network: unknown network "classic"`. A build from the wrong source
-therefore fails the run rather than quietly publishing an empty tree.
-
-## Only nodes on the current fork ID are published
-
-**`-eth-network` admits every stage of the fork schedule, not only the current
-one.** It is core-geth's `forkid.NewStaticFilter`, which judges
-[EIP-2124](https://eips.ethereum.org/EIPS/eip-2124) compatibility from block
-zero. From there every later stage looks like a node that is ahead, so any fork
-ID on the network's schedule passes and only one off it is rejected.
-
-**That admits nodes a new client cannot sync from.** A node that starts from an
-empty chain advertises the genesis stage in its record until it imports its first
-block, because the record is refreshed only on a new chain head and a snap sync
-sets none until it finishes. Such a node answers every discovery ping, so it
-ranks as fresh.
-Measured 2026-09-25:
-
-| classic | current `be46d57c` | genesis stage `fc64ec04` | before Spiral `7fd1bb25` |
-|---|---|---|---|
-| published tree, before this check | 46 | 73 | 1 |
-| crawl set, before the cap | 139 | 279 | 2 |
-
-A new node syncing Ethereum Classic mainnet that day dropped 8 distinct peers on
-sync timeouts, and all 8 were in the genesis-stage group. That stage is also the
-one Ethereum mainnet shares, so the record cannot say which chain such a node is
-on.
-
-**So the script keeps only nodes on `FORK_HASH_CLASSIC` or `FORK_HASH_MORDOR`**,
-the fork hash a node at the chain head advertises, and it does so before the cap,
-so the cap chooses among current nodes. Moving the filter's vantage point to the
-chain head would not be enough: EIP-2124 also accepts a node that is behind when
-its next fork matches, which is the genesis-stage case again.
-
-**The values are pinned, and a pin goes stale at the next fork.** Before a
-scheduled fork activates, nodes that announce it as their next fork and nodes
-that do not yet know of it carry the same hash, and both are kept. Once any node
-on the schedule advertises the hash that follows the pin, the script refuses to
-publish and names the new value. The last published tree stays in DNS until the
-pin is updated; the script never falls back to publishing the stage the network
-has left.
-
-## How large a tree is, and why
-
-The cap comes from the DNS zone budget rather than from what the crawl happens
-to find. A tree of N nodes costs N, plus one root record, plus about one branch
-record per 11 nodes — measured against real signed trees at 11 nodes → 14
-records and 150 → 165.
-
-**Both trees share one budget, and discovery does not get all of it.** A
-Cloudflare zone created on or after 2024-09-01 on the free plan holds **200
-records** — for the whole zone, not per tree. The classic and mordor trees are
-both in it, alongside the project's own services: mail records, the apex site,
-and subdomains for explorers and dashboards. Whatever the zone already holds
-counts against the same 200.
+## The trees
 
 ```
-classic  120 nodes -> ~132 records
-mordor    15 nodes ->  ~18 records   (actual yield is 11 -> 14; the cap is a ceiling)
-                       ~150, leaving room for the domain's other services
+enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.classic.ethereumclassic.net
+enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.classic.ethclassic.net
+enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.classic.ethereumclassic.network
+enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.mordor.ethereumclassic.net
+enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.mordor.ethclassic.net
+enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.mordor.ethereumclassic.network
 ```
 
-**A tree's job is to reach the first few peers**, after which the discv4 DHT does
-the work. Against three hardcoded bootnodes, 120 nodes is already a large
-improvement, and the marginal value of node 300 is close to zero. Mordor's cap of
-15 sits above an observed yield of 11 that has never been exceeded on any run
-measured, so it is headroom rather than a constraint.
+`all.classic.` is Ethereum Classic and `all.mordor.` is its Mordor test network.
+All six are signed by one key, the text between `enrtree://` and `@`, and the
+same URLs are compiled into core-geth. Each directory in this repository holds
+one published tree and is named after the DNS name it serves.
 
-**No `snap.*` trees are published.** No core-geth path points snap discovery at
-one on any network — `SnapDiscoveryURLs` is set equal to `EthDiscoveryURLs` at
-every assignment site, and `SetDNSDiscoveryDefaults` hardcodes protocol `all`.
-Publishing them would spend roughly 45% of the record budget on trees nothing
-reads, which on a 200-record budget is the difference between 120 published
-classic nodes and 65.
+## Quick start
 
-## Prior art: etclabscore/discv4-dns-lists
+**Core-geth `v1.13.x`:** nothing to configure. Both networks read these trees by
+default.
 
-[`etclabscore/discv4-dns-lists`](https://github.com/etclabscore/discv4-dns-lists)
-publishes the `blockd.info` and `etcdisco.net` trees and has run in production for
-years. This repository is not a fork of it, but several things here come from
-reading it.
+**Core-geth `v1.12.x`:** add `--discovery.dns` with the three trees for your
+network.
 
-**Adopted:** the sort by `lastResponse` then `score` before truncating, so the cap
-keeps the freshest, best-scoring nodes rather than an arbitrary slice; and the
-per-network cap itself, which exists because **Cloudflare limits records per
-zone**.
-
-**Not adopted, deliberately:** it publishes `les.*` trees. LES is being retired,
-and both that repository and the Ethereum Foundation's currently publish **zero
-nodes** into their `les.` trees.
-
-**Where this repository differs:** it seeds from the existing published trees
-before crawling, and it refuses to publish a tree that is empty, below an
-absolute floor, or sharply smaller than the last one, or any tree at all on a run
-where most of the last tree's nodes stopped answering. Those checks are additions
-for this deployment, not corrections to prior art.
-
-The two also build their working set differently. That repository rebuilds
-`all.json` from its own capped published trees before each crawl, so its size
-reflects roughly one crawl's unfiltered reach rather than accumulated history.
-This one seeds externally, from other operators' trees, and appends — which is
-why a low cold-start yield here is not evidence of a broken crawl.
-
-## Three checks stand between a bad crawl and DNS
-
-**An absolute floor** per network, and **a relative one**: a tree that shrinks
-below half of the last published count is refused. Neither alone is sufficient. A
-floor high enough to catch a run that lost its seed trees would fail a legitimate
-crawl-only run; one low enough to pass both would never fire.
-
-The relative check compares against the last **committed** tree, which is why the
-commit step matters as much as the publish step — without it there is no baseline
-and the check cannot fire at all.
-
-**A retention check** catches the failure the other two cannot see. When the
-runner itself loses the network, the crawl marks every node it cannot reach as
-failing, but the cap still fills each tree from nodes that answered on earlier
-runs, so no tree shrinks. So before anything is published, the run counts how
-many of the last committed tree's nodes answered it, and refuses when fewer than
-half did: a network does not lose half its reachable nodes overnight, and a
-runner's connection can. Over the first sixteen nightlies, 111 to 119 of 120
-classic nodes answered the next night, and mordor's worst night was 8 of 13. A
-refused run commits nothing, so the scores it cut on nodes it could not reach are
-discarded with it.
-
-All three refuse rather than publish. A client reading a tree cannot tell a
-broken crawl from a quiet network.
-
-## A refusal is reported, not silent
-
-GitHub's own notification for a scheduled run goes only to whoever last edited
-the workflow's schedule. So **every scheduled run also rewrites one issue**,
-labelled `pipeline-status` and opened
-by the workflow, with its result: the state, the last success and failure, the
-consecutive-failure count and the latest failure's `ERROR` lines, never the whole
-log. GitHub sends no notification for an edit, so the run also **comments** on
-the issue when the state changes: on the first failure after a success, and on
-the first success after failures. Subscribing to that one issue is how to hear
-about exactly those, without a new issue or a notification every night.
-
-The issue is found by its label and its author, never its title, since anyone
-can open an issue with a matching title. If the runner dies before the report
-step runs, nothing is posted; the last-success date in the issue's title is what
-shows the gap.
-
-## Running it by hand
-
-```bash
-git clone https://github.com/ethereumclassic/core-geth.git /tmp/core-geth
-cd /tmp/core-geth && go build -o /tmp/devp2p ./cmd/devp2p
-
-cd /path/to/discv4-dns-lists
-DEVP2P=/tmp/devp2p CORE_GETH_SRC=/tmp/core-geth ./scripts/update-lists.sh --dry-run
+```sh
+geth --classic --discovery.dns "enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.classic.ethereumclassic.net,enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.classic.ethclassic.net,enrtree://APDLRZ2T7ERXPWXX4D5USB32NIFYHXMFVZQ3DZALK6JJJ5L4VSYIQ@all.classic.ethereumclassic.network"
 ```
 
-`--dry-run` crawls, filters and caps but neither signs nor publishes, and needs no
-secrets. Use it to see what a crawl would produce before letting one reach DNS.
+[Using the trees](docs/using-the-trees.md) has the Mordor and config-file forms.
 
-**A tree that will not sync locally is not necessarily dead.** `devp2p dns sync`
-resolves through the system resolver and has no option to use another one. It
-fetches one record at a time, at most three a second, and gives each lookup five
-seconds with no retry, so a single slow answer fails the whole sync; `--timeout`
-lengthens that limit. A stub resolver such as `systemd-resolved` at `127.0.0.53`
-has been measured failing it outright while the same tree resolves fine through
-a public resolver — a sync returning nothing, against `dig`
-returning records normally, is the signature.
+## Documentation
 
-`dig @1.1.1.1 TXT <tree-root>` confirms the tree is alive, but it cannot repair
-the sync: only the resolver the process itself uses decides that. Point the
-system resolver at a public one, or run the command in a namespace with its own
-`resolv.conf`, before concluding a tree is unreachable.
-
-## Secrets
-
-| Secret | Purpose |
+| Page | What it covers |
 |---|---|
-| `DNS_SIGNING_KEY` | Ethereum **keystore JSON** for the key that signs the trees |
-| `DNS_SIGNING_KEY_PASSWORD` | password for that keystore |
-| `CLOUDFLARE_API_TOKEN` | token scoped to DNS edit on the Cloudflare zones |
+| [Using the trees](docs/using-the-trees.md) | Pointing any core-geth release at these trees |
+| [Verifying a tree](docs/verifying-a-tree.md) | Checking what DNS serves against what this repository recorded |
+| [DNS hosting and outages](docs/dns-outage.md) | What a DNS outage affects, and starting a node without the trees |
+| [How nodes are chosen](docs/node-selection.md) | What gets a node listed, the current fork ID, and tree size |
+| [How the lists are built](docs/pipeline.md) | The nightly pipeline, its safety checks, and running it by hand |
+| [Why this repository exists](docs/history.md) | The ETC Cooperative transition and the predecessor trees |
 
-Cloudflare **zone IDs** are not in that table on purpose. `devp2p` cannot find a
-zone from a tree name, so each Cloudflare domain's zone ID is supplied through
-`CLOUDFLARE_ZONE_IDS` as `domain=zoneid` pairs. A zone ID grants nothing on its
-own and is shown in the provider's dashboard, so it travels as reviewable
-configuration in the workflow rather than as a secret.
+## Status
 
-**The signing key is a keystore JSON, not a raw key.** `devp2p dns sign` loads it
-with `keystore.DecryptKey` and reads the password from stdin; a raw hex key fails
-with `error decrypting key`. That is why there are two secrets rather than one.
+Every scheduled run reports its result on one issue labeled
+[`pipeline-status`](https://github.com/ethereumclassic/discv4-dns-lists/issues?q=label%3Apipeline-status).
+Subscribe to it to be notified when a run fails and when it recovers.
 
-**Its public half is compiled into clients** as the `enrtree://<pubkey>@<domain>`
-prefix in core-geth's `params/bootnodes_*.go`. Losing the private half means every
-release carrying that prefix must be rebuilt to point at a new one. Treat it as a
-long-lived project key, not a CI credential.
+## Support this work
 
-No key belongs in this repository in any form: `.gitignore` refuses `*.key` and
-`*.pem`, and the workflow writes both halves to the runner's temp directory and
-removes them in a step that runs even when the job fails.
+Publishing these trees has been unfunded public-goods work. Mining pools,
+exchanges, block explorers, RPC providers and anyone running an Ethereum Classic
+node depend on peer discovery working every night. If your operation relies on
+Ethereum Classic, please help fund that work.
+[Support this work](docs/support.md) carries the routes: an invoiced maintenance
+agreement for organizations, or a direct transfer to an address provided on
+request.
 
 ## License
 
