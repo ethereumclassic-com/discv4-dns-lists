@@ -7,7 +7,7 @@
 #   ./scripts/report-status.sh <success|failure|cancelled> <run url> [run log]
 #
 # A failing run must not be silent, and a run that keeps failing must not open
-# an issue a night. So there is exactly one issue, labelled STATUS_LABEL and
+# an issue a night. So there is exactly one issue, labeled STATUS_LABEL and
 # opened by the workflow itself, and every run rewrites its title and body with
 # the latest result. GitHub notifies nobody of an edit, so the run also comments
 # on the first failure after a success and on the first success after a failure:
@@ -84,7 +84,7 @@ else:
     block = "```\n%s\n```" % "\n".join(errors)
     comment = (None if was_failing else
                "**Failing** as of %s ([workflow run](%s)): the run %s.\n\n%s"
-               % (now, run_url, "was cancelled" if outcome == "cancelled" else "did not complete", block))
+               % (now, run_url, "was canceled" if outcome == "cancelled" else "did not complete", block))
     failure_section = ("<!-- latest-failure:start -->\n### Latest failure: %s\n\n%s\n<!-- latest-failure:end -->"
                        % (now, block))
     title = "DNS lists: FAILING since %s (%d run%s)" % (st["since"], n, "" if n == 1 else "s")

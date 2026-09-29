@@ -66,13 +66,14 @@ RETENTION_MIN_PCT="${RETENTION_MIN_PCT:-50}"
 # subdomains for explorers and dashboards, and whatever it already carries.
 #
 #   classic 120 -> ~132 records
-#   mordor   15 ->  ~18 records  (actual yield is 11 -> 14; the cap is a ceiling)
+#   mordor   15 ->  ~18 records  (a ceiling; each run's count is in its commit)
 #   both              ~150 of 200, leaving the rest for the domain's services
 #
 # A tree's job is to reach the first few peers, after which the discv4 DHT does
 # the work. Against three hardcoded bootnodes, 120 nodes is already a large
 # improvement and the marginal value of node 300 is close to zero. Mordor's cap
-# sits above its observed yield of 11, so it is headroom rather than a limit.
+# is headroom for a small network: its tree carries every current node the crawl
+# finds, up to the cap.
 CAP_CLASSIC="${CAP_CLASSIC:-120}"
 CAP_MORDOR="${CAP_MORDOR:-15}"
 cap_for() { case "$1" in classic) echo "$CAP_CLASSIC";; mordor) echo "$CAP_MORDOR";; *) echo 100;; esac; }
@@ -103,12 +104,14 @@ fork_hash_for() { case "$1" in classic) echo "$FORK_HASH_CLASSIC";; mordor) echo
 
 # domain:publisher pairs.
 #
-# All three domains are on Cloudflare. This is not provider diversity: one
-# Cloudflare account problem removes every ETC discovery path at once.
+# All three domains are served from one Cloudflare account. This is not provider
+# diversity: a problem with that account takes all six trees offline at once. It
+# does not reach the bootnodes, which clients contact by IP address, and it
+# cannot alter a tree, which is signed with a key held apart from the account.
 #
-# Adding a provider needs no devp2p change: render with `to-txt` and hand the
-# result to an external publisher. Such a publisher must be incremental -- see
-# publish_desec.
+# Moving a domain to another provider needs no devp2p change: render with
+# `to-txt` and hand the result to an external publisher. Such a publisher must
+# be incremental -- see publish_desec.
 DOMAINS="${DOMAINS:-ethereumclassic.net:cloudflare ethclassic.net:cloudflare ethereumclassic.network:cloudflare}"
 
 # Cloudflare zone IDs, as space-separated domain=zoneid pairs.
@@ -178,10 +181,11 @@ log "seeded from $(tr ',' '\n' <<<"$BOOT_CLASSIC" | wc -l) classic and $(tr ',' 
 # is dropped at zero, and a seeded node that has never answered is pruned in
 # seed_from_trees once no seed tree carries it.
 #
-# It matters most on Mordor. Measured: a 15-minute crawl seeded from the single
-# hardcoded Mordor bootnode matched 3 nodes, while the published trees carried
-# 11 -- so a tree built from the crawl alone would be a downgrade for anyone who
-# switched to it. Seeded this way, ours is a superset.
+# It matters most on Mordor. Measured before the first publish: a 15-minute crawl
+# seeded from the one Mordor bootnode core-geth v1.12.x ships matched 3 nodes,
+# while the published trees carried 11 -- so a tree built from the crawl alone
+# would have been a downgrade for anyone who switched to it. Seeded, the crawl
+# starts from everything those trees carry and keeps what still answers.
 #
 # This project's own trees are seeded first, so a run can rebuild from what it
 # last published if the others stop resolving. Two domains rather than one,

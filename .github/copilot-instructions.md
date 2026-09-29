@@ -20,8 +20,17 @@ DNS discovery trees. A crawl of the discv4 DHT is filtered per network, capped,
 signed with the project key and written to DNS; the node sets are committed here
 as the public audit trail.
 
+These trees continue the discovery service the ETC Cooperative maintained through
+`etclabscore/discv4-dns-lists`, and core-geth `v1.13.x` reads them by default. The
+note at the top of `README.md` is the migration guidance for operators.
+
 **This is bootstrap infrastructure for a live network.** A bad publish is not a
 failing build — it is clients that cannot find peers.
+
+**All three domains are served from one Cloudflare account.** That is one DNS
+provider, so do not describe the trees as provider-redundant. The account has no
+part in the bootnodes, which clients reach by IP address, and cannot alter a tree,
+because every record is signed with the project key.
 
 ## Stack
 
@@ -68,6 +77,8 @@ running, but nothing gates on either.
 scripts/update-lists.sh                 # seed, crawl, filter, cap, sign, publish
 scripts/report-status.sh                # rewrites the status issue after every run
 .github/workflows/update-dns-lists.yml  # runs it; builds devp2p, handles secrets, commits
+.github/FUNDING.yml                     # the Sponsor button, pointing at docs/support.md
+docs/                                   # operator and maintainer docs; README.md routes to them
 all.json                                # working node set, unfiltered, cumulative
 all.<network>.<domain>/nodes.json       # one published tree per network per domain
 ```
@@ -102,7 +113,7 @@ hand-edit a `nodes.json`.
 Every one of these checks refuses rather than publishes. Refusing is always the
 correct direction — a client cannot tell a broken crawl from a quiet network.
 
-A refused or failed run is reported on one issue labelled `pipeline-status`,
+A refused or failed run is reported on one issue labeled `pipeline-status`,
 which the workflow rewrites after every scheduled run and comments on only when
 the state changes. Subscribe to it for alerts; do not close it.
 

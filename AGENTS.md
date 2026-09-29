@@ -5,9 +5,15 @@ DNS discovery trees. A crawl of the discv4 DHT is filtered per network, capped,
 signed with the project key and written to DNS; the resulting node sets are
 committed here as the public audit trail.
 
-[README.md](README.md) explains *why* each design choice was made and is the
-reference for the mechanism. This file is what an agent needs in order to work
-here without breaking something.
+These trees continue the discovery service the ETC Cooperative maintained through
+`etclabscore/discv4-dns-lists`, and core-geth `v1.13.x` reads them by default. The
+note at the top of `README.md` is the migration guidance for operators; keep it
+consistent with core-geth's own ETC Cooperative transition page.
+
+[`docs/`](docs/) explains *why* each design choice was made and is the reference
+for the mechanism; [README.md](README.md) is the landing page that routes to it.
+This file is what an agent needs in order to work here without breaking
+something.
 
 **This repository is bootstrap infrastructure for a live network.** A bad publish
 is not a failing build — it is clients that cannot find peers. Every rule below
@@ -82,6 +88,8 @@ been misread as a network fault more than once.
 scripts/update-lists.sh              # the whole pipeline: seed, crawl, filter, cap, sign, publish
 scripts/report-status.sh             # rewrites the status issue after every scheduled run
 .github/workflows/update-dns-lists.yml  # runs it; builds devp2p, handles secrets, commits results
+.github/FUNDING.yml                  # the Sponsor button, pointing at docs/support.md
+docs/                                # operator and maintainer documentation; README.md routes to it
 all.json                             # working node set, unfiltered, cumulative across runs
 all.<network>.<domain>/nodes.json    # one published tree per network per domain
 ```
@@ -91,7 +99,7 @@ hand-maintained source. Do not edit a `nodes.json` by hand.
 
 ## Domains
 
-Three domains, all on Cloudflare.
+Three domains, all served from one Cloudflare account.
 
 | Domain | Provider | Publisher |
 |---|---|---|
@@ -99,9 +107,12 @@ Three domains, all on Cloudflare.
 | `ethclassic.net` | Cloudflare | `devp2p dns to-cloudflare` |
 | `ethereumclassic.network` | Cloudflare | `devp2p dns to-cloudflare` |
 
-**One provider is not provider diversity.** A single Cloudflare account problem
-removes every ETC discovery path at once. Do not describe these trees as
-provider-redundant.
+**One DNS account is not provider diversity.** A problem with the Cloudflare
+account takes all six trees offline at once; three names protect only against a
+problem with one name or zone. Do not describe these trees as provider-redundant.
+The account has no part in the bootnodes, which clients reach by IP address, and
+it cannot alter a tree: every record is signed with the project key, which is
+held apart from the account, and clients verify it.
 
 **Each Cloudflare domain needs its zone ID.** `devp2p` resolves a zone by name
 only when `--zoneid` is absent, and it passes the *tree* name to that lookup, so
@@ -110,23 +121,23 @@ it matches no zone and the publish fails. `CLOUDFLARE_ZONE_IDS` carries
 zone ID is not a credential and belongs in the workflow's env block, not its
 secrets.
 
-**Adding a provider needs no `devp2p` change and no client release.** It
-automates Cloudflare and Route53 only, so anything else is published from
-`to-txt` output by a script in this repository, selected per domain in
-`DOMAINS`.
+**Moving a domain to another provider needs no `devp2p` change and no client
+release**, since the tree URL stays the same. `devp2p` automates Cloudflare and
+Route53 only, so anything else is published from `to-txt` output by a script in
+this repository, selected per domain in `DOMAINS`.
 
 **Any such publisher must be incremental.** EIP-1459 records are
 content-addressed, so an unchanged node keeps its record name and value and only
-genuine churn needs writing. A delete-and-recreate rewrite of a ~180-record tree
-is ~360 operations, which exceeds a typical free-tier daily change budget. The
-`desec` branch is the shape this takes: it renders with `to-txt` and delegates
-to `$DESEC_PUBLISHER`. No publisher is configured, so selecting that branch
-fails rather than publishing.
+genuine churn needs writing. Deleting and recreating every record costs two
+operations per record, about 300 a night for a domain carrying both trees, which
+exceeds a typical free-tier daily change budget. The `desec` branch is the shape
+this takes: it renders with `to-txt` and delegates to `$DESEC_PUBLISHER`. No
+publisher is configured, so selecting that branch fails rather than publishing.
 
 ## The numbers, and why they are what they are
 
-Change none of these without reading the reasoning in `README.md` and in the
-script's own comments first.
+Change none of these without reading the reasoning in `docs/pipeline.md`,
+`docs/node-selection.md` and the script's own comments first.
 
 - **Caps** — `CAP_CLASSIC=120`, `CAP_MORDOR=15`. Derived from the DNS zone
   budget, not from crawl yield. A tree of N nodes costs N + 1 root + ~1 branch
@@ -135,15 +146,16 @@ script's own comments first.
   trees share it, alongside mail records, the apex site and service subdomains,
   and whatever the zone already holds. Raising either cap eats that headroom.
 - **Floors** — `MIN_NODES_CLASSIC=40`, `MIN_NODES_MORDOR=5`. These are floors
-  against a broken run, **not targets**. `MIN_NODES_MORDOR` is 5 against an
-  observed 11 deliberately: Mordor's ceiling is the network, not the crawl, and
-  a floor scaled from classic's numbers would refuse every legitimate Mordor
-  publish.
+  against a broken run, **not targets**. `MIN_NODES_MORDOR` is 5, well below a
+  normal night's Mordor count, deliberately: Mordor's ceiling is the network, not
+  the crawl, and a floor scaled from classic's numbers would refuse every
+  legitimate Mordor publish. Each night's counts are in its commit message.
 - **Shrink tolerance** — 50% of the last *committed* tree. This is the only
   guard against a crawl that lost its seed trees and would otherwise replace a
-  340-node tree with a healthy-looking 44-node one. It reads its baseline from
-  `git show HEAD:<dir>/nodes.json`, **so the commit step is load-bearing**: if
-  trees are never committed there is no baseline and the check cannot fire.
+  full 120-node tree with a healthy-looking 44-node one. It reads its baseline
+  from `git show HEAD:<dir>/nodes.json`, **so the commit step is
+  load-bearing**: if trees are never committed there is no baseline and the
+  check cannot fire.
 - **Retention** — `RETENTION_MIN_PCT=50`. Before anything is published, the run
   refuses if fewer than half of the last committed tree's nodes answered it. This
   is the guard against the runner's own connectivity failing: a crawl that cannot
@@ -168,23 +180,24 @@ correct direction.
 - **The node set is cumulative.** `devp2p discv4 crawl` appends to an existing
   set rather than replacing it. One crawl sees one moment — a low cold-start
   yield is not a broken crawl.
-- **Seeding is reach, not trust.** The pipeline seeds from other operators'
-  published trees, then the crawl re-pings every seeded node. A node that does
-  not answer is not republished, and it is removed: after a few missed checks
-  if it once answered, or, if it never answered, once no seed tree carries it.
-  That second prune runs only when every seed tree synced, so a resolver fault
-  here is never read as the trees dropping those records.
+- **Seeding is reach, not trust.** The pipeline seeds from published trees, its
+  own and the predecessor's for as long as they resolve, then the crawl re-pings
+  every seeded node. A node that does not answer is not republished, and it is
+  removed: after a few missed checks if it once answered, or, if it never
+  answered, once no seed tree carries it. That second prune runs only when every
+  seed tree synced, so a resolver fault here is never read as the trees dropping
+  those records.
 - **A failed run is reported on one status issue.** GitHub's own notification
   for a scheduled run reaches only whoever last edited its schedule, so the
-  workflow also keeps a single issue labelled `pipeline-status`, rewrites it
+  workflow also keeps a single issue labeled `pipeline-status`, rewrites it
   after every scheduled run, and comments on it only when the state changes.
   GitHub sends no notification for an edit, so subscribing to that issue is how
   to hear of a failure and of the recovery. Do not close it or remove its label;
   the workflow finds it by label and author, never by title.
 - **Only `all.*` trees are published.** No `snap.*` — no core-geth path points
-  snap discovery at one on any network. No `les.*` — LES is being retired, and
-  the publishers that still carry those trees publish zero nodes into them.
-  Adding either spends the record budget on trees nothing reads.
+  snap discovery at one on any network. No `les.*` — core-geth `v1.13.x` reads
+  the `all.*` trees in every sync mode, light included. Adding either spends the
+  record budget on trees nothing reads.
 
 ## Dependency updates
 
