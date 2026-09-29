@@ -53,15 +53,8 @@ jobs:
           # from the bootnode list in this same checkout and should track what
           # the client actually ships rather than a frozen copy of it.
           #
-          # main rather than master, and the reason is the toolchain. The Go
-          # version comes from this checkout's go.mod: master declares go 1.21,
-          # whose final patch is years past its last standard-library security
-          # fix, and master cannot be built by a supported Go at all -- it
-          # depends on a package that reaches into runtime internals modern Go
-          # no longer exposes. main declares go 1.26 and drops that dependency.
-          #
-          # The seed set is unaffected: both refs ship the same three classic
-          # and one mordor bootnodes, compared entry by entry before switching.
+          # main is core-geth's default branch, and its go.mod sets the Go
+          # version the next step installs.
           ref: main
 
       - name: Set up Go
@@ -121,10 +114,11 @@ jobs:
           # devp2p reads this as the EnvVar for its --token flag, so it is not
           # passed on the command line where it would land in /proc/<pid>/cmdline.
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          # All three domains publish to Cloudflare, the only provider devp2p
-          # drives natively without additional tooling. This is not provider
-          # diversity: one Cloudflare account problem removes every ETC
-          # discovery path at once.
+          # All three domains are served from one Cloudflare account, which
+          # devp2p publishes to natively, as it does to Route53; any other
+          # provider goes through to-txt. This is not provider diversity: a
+          # problem with the account takes all six trees offline at once. It
+          # does not reach the bootnodes, which clients contact by IP address.
           DOMAINS: 'ethereumclassic.net:cloudflare ethclassic.net:cloudflare ethereumclassic.network:cloudflare'
           # Configuration, not secrets: a zone ID is visible in the provider
           # dashboard and grants nothing on its own. devp2p cannot derive them
