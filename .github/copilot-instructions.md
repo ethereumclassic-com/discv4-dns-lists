@@ -32,6 +32,17 @@ provider, so do not describe the trees as provider-redundant. The account has no
 part in the bootnodes, which clients reach by IP address, and cannot alter a tree,
 because every record is signed with the project key.
 
+**Contact addresses are on `ethereumclassic.net`** and match Core-Geth's. Security
+reports go to `security@ethereumclassic.net` (`SECURITY.md`), never to a public
+issue. Funding mail goes to `donations@ethereumclassic.net` (`docs/support.md`).
+Do not move either to another domain, and do not publish a donation address.
+
+**The Ethereum Classic DAO is the legal entity that maintains these public goods
+and, today, their funder of last resort.** Credit it in the funders table of
+`docs/support.md`, and do not write as though its funding settles the matter:
+that page asks the network's stakeholders to sponsor the work. The table is the
+operator's record; change an entry only when asked to.
+
 ## Stack
 
 There is **no package manifest of any kind** here: no `package.json`, `go.mod`,
@@ -78,6 +89,7 @@ scripts/update-lists.sh                 # seed, crawl, filter, cap, sign, publis
 scripts/report-status.sh                # rewrites the status issue after every run
 .github/workflows/update-dns-lists.yml  # runs it; builds devp2p, handles secrets, commits
 .github/FUNDING.yml                     # the Sponsor button, pointing at docs/support.md
+SECURITY.md                             # how to report a vulnerability privately
 docs/                                   # operator and maintainer docs; README.md routes to them
 all.json                                # working node set, unfiltered, cumulative
 all.<network>.<domain>/nodes.json       # one published tree per network per domain

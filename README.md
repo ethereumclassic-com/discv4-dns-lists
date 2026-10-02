@@ -71,15 +71,31 @@ Every scheduled run reports its result on one issue labeled
 [`pipeline-status`](https://github.com/ethereumclassic/discv4-dns-lists/issues?q=label%3Apipeline-status).
 Subscribe to it to be notified when a run fails and when it recovers.
 
+## Security
+
+**To report a security issue privately**, email <security@ethereumclassic.net>.
+[`SECURITY.md`](SECURITY.md) has the details. Security issues are never reported
+as public issues.
+
 ## Support this work
 
-Publishing these trees has been unfunded public-goods work. Mining pools,
-exchanges, block explorers, RPC providers and anyone running an Ethereum Classic
-node depend on peer discovery working every night. If your operation relies on
-Ethereum Classic, please help fund that work.
-[Support this work](docs/support.md) carries the routes: an invoiced maintenance
-agreement for organizations, or a direct transfer to an address provided on
-request.
+These trees are a public good. The
+[Ethereum Classic DAO](https://ethereumclassicdao.org) is the legal entity that
+maintains them, together with Ethereum Classic's core developers and community
+contributors, and today it also pays for that work, as its funder of last resort.
+The repositories stay in the `ethereumclassic` organization no matter who
+maintains or funds them. Earlier, this work moved between ETCDEV, ETC Labs and
+the ETC Cooperative as each one closed or left. With the ETC Cooperative's
+dissolution, Ethereum Classic stakeholders such as mining pools, exchanges and
+service providers should use <security@ethereumclassic.net> as their point of
+contact.
+
+If you are a stakeholder of Ethereum Classic, you rely on this infrastructure,
+and Ethereum Classic has no protocol-layer funding mechanism for its critical
+infrastructure or its core developers. Please consider sponsoring it.
+[Support this work](docs/support.md) lists who has funded it, explains how
+sponsors are credited, and gives the routes: an invoiced maintenance agreement for
+organizations, or a direct transfer to an address provided on request.
 
 ## License
 

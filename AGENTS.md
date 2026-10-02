@@ -89,6 +89,7 @@ scripts/update-lists.sh              # the whole pipeline: seed, crawl, filter, 
 scripts/report-status.sh             # rewrites the status issue after every scheduled run
 .github/workflows/update-dns-lists.yml  # runs it; builds devp2p, handles secrets, commits results
 .github/FUNDING.yml                  # the Sponsor button, pointing at docs/support.md
+SECURITY.md                          # how to report a vulnerability privately
 docs/                                # operator and maintainer documentation; README.md routes to it
 all.json                             # working node set, unfiltered, cumulative across runs
 all.<network>.<domain>/nodes.json    # one published tree per network per domain
@@ -198,6 +199,18 @@ correct direction.
   snap discovery at one on any network. No `les.*` — core-geth `v1.13.x` reads
   the `all.*` trees in every sync mode, light included. Adding either spends the
   record budget on trees nothing reads.
+- **Contact addresses are on `ethereumclassic.net`**, the domain for the public
+  goods the `ethereumclassic` organization maintains, and they match Core-Geth's.
+  Security reports go to `security@ethereumclassic.net` (`SECURITY.md`), never to
+  a public issue. Funding mail goes to `donations@ethereumclassic.net`
+  (`docs/support.md`). Do not move either to another domain, and do not publish a
+  donation address: one is provided on request from that mailbox.
+- **The Ethereum Classic DAO is the legal entity that maintains these public
+  goods and, today, their funder of last resort.** Credit it in the funders table
+  of `docs/support.md`, and do not write as though its funding settles the
+  matter: that page asks the network's stakeholders to sponsor the work so that
+  it no longer rests on one backer. The table is the operator's record: add or
+  change an entry only when asked to.
 
 ## Dependency updates
 
