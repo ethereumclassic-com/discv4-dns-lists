@@ -2,7 +2,7 @@
 
 A client checks every record it downloads against the key in the tree's URL. The
 commands below make the same check by hand, and compare what DNS serves with what
-this repository recorded when it published.
+this repository recorded when the tree was published.
 
 ## Compare a tree with this repository
 

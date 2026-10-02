@@ -1,7 +1,7 @@
 # How nodes are chosen
 
-What gets a node into a tree, why a tree holds only nodes on the network's
-current fork, and how large a tree can be.
+This page covers what gets a node into a tree, why a tree holds only nodes on the
+network's current fork, and how large a tree can be.
 
 ## What gets a node listed
 
@@ -22,8 +22,8 @@ further peers through the discovery network itself.
 **`-eth-network` admits every stage of the fork schedule, not only the current
 one.** It is core-geth's `forkid.NewStaticFilter`, which judges
 [EIP-2124](https://eips.ethereum.org/EIPS/eip-2124) compatibility from block
-zero. From there every later stage looks like a node that is ahead, so any fork
-ID on the network's schedule passes and only one off it is rejected.
+zero. From there, every later stage looks like a node that is ahead, so any fork
+ID on the network's schedule passes, and only one that is not on it is rejected.
 
 **That admits nodes a new client cannot sync from.** A node that starts from an
 empty chain advertises the genesis stage in its record until it imports its first
@@ -60,8 +60,8 @@ has left.
 ## How large a tree is, and why
 
 The cap comes from the DNS zone budget rather than from what the crawl happens
-to find. A tree of N nodes costs N, plus one root record, plus about one branch
-record per 11 nodes, measured against real signed trees at 11 nodes → 14
+to find. A tree of N nodes costs N records, plus one for the root, plus about one
+branch record per 11 nodes, measured against real signed trees at 11 nodes → 14
 records and 150 → 165.
 
 **Both trees share one budget, and discovery does not get all of it.** A

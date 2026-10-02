@@ -30,14 +30,14 @@ organization. The trees here are published under three domain names and rebuilt
 every night. The bootnodes `v1.13.x` ships are run by the Core-Geth maintainers
 and spread across hosting providers and countries. In `v1.13.0`, the three
 Classic bootnodes are with Hetzner in Germany, OVH in the United States and
-Contabo in Singapore, and the two Mordor bootnodes with Hetzner in Finland and OVH
-in the United States.
+Contabo in Singapore, and the two Mordor bootnodes are with Hetzner in Finland and
+OVH in the United States.
 
 **A tree does not go stale the way a bootnode list does.** A client carries a
 tree's URL, which names a domain and a signing key. The nodes behind it are
 replaced every night as the crawl finds new ones and drops those that stop
 answering, so a node that shuts down never needs a client release to route
-around.
+around it.
 
 **The pipeline runs in the open.** Its code, its configuration and every list it
 has published are in this public repository of the organization, so more than one

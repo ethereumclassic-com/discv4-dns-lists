@@ -1,12 +1,14 @@
 # How the lists are built
 
-The nightly pipeline behind the trees, the checks that stop a bad crawl from
-reaching DNS, how a failed run is reported, and how to run it by hand.
+This page covers the nightly pipeline behind the trees, the checks that stop a
+bad crawl from reaching DNS, how a failed run is reported, and how to run it by
+hand.
 
 ## The pipeline
 
 [`scripts/update-lists.sh`](../scripts/update-lists.sh), run nightly by
-[`update-dns-lists.yml`](../.github/workflows/update-dns-lists.yml):
+[`update-dns-lists.yml`](../.github/workflows/update-dns-lists.yml), does four
+things:
 
 1. **Seed** from published trees: this repository's own, and the predecessor's
    for as long as they resolve.
@@ -60,8 +62,9 @@ fails the run rather than quietly publishing an empty tree.
 
 ## Three checks stand between a bad crawl and DNS
 
-**An absolute floor** per network, and **a relative one**: a tree that shrinks
-below half of the last published count is refused. Neither alone is sufficient. A
+The first two are **an absolute floor** per network and **a relative one**: a
+tree that shrinks below half of the last published count is refused. Neither
+alone is sufficient. A
 floor high enough to catch a run that lost its seed trees would fail a legitimate
 crawl-only run; one low enough to pass both would never fire.
 
@@ -74,8 +77,8 @@ runner itself loses the network, the crawl marks every node it cannot reach as
 failing, but the cap still fills each tree from nodes that answered on earlier
 runs, so no tree shrinks. So before anything is published, the run counts how
 many of the last committed tree's nodes answered it, and refuses when fewer than
-half did: a network does not lose half its reachable nodes overnight, and a
-runner's connection can. Over the first sixteen nightlies, 111 to 119 of 120
+half did: a network does not lose half its reachable nodes overnight, but a
+runner can lose its connection. Over the first sixteen nightlies, 111 to 119 of 120
 classic nodes answered the next night, and mordor's worst night was 8 of 13. A
 refused run commits nothing, so the scores it cut on nodes it could not reach are
 discarded with it.
